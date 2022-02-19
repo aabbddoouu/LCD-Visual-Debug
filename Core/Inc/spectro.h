@@ -1,5 +1,4 @@
 #include <main.h>
-#include <atomm_utils.h>
 ///////////////////////////////////////////
 /// Psectro General Stuff
 //////////////////////////////////////////
@@ -191,32 +190,7 @@
 
 #define FP_DEC_RES          1.f/16
 
-typedef struct
-{
-    uint16_t T_FP;
-    uint16_t Em_FP;
-    uint16_t Oxy_FP;
-    uint16_t LikH_FP;
-}DAC_data;
 
-
-
-void spectro_thread();
-
-void init_DAC_spi();
-void Spectro_SendCommand (
-	uint16_t command,
-    uint16_t nargs,
-    ...
-);
-uint16_t Spectro_ReadResp(
-    uint16_t *message_return,
-    uint32_t payload[],
-    uint16_t *p_length
-);
-uint16_t Spectro_GetStatus(
-    uint16_t *p_length
-);
 
 void uart_SendCommand (uint16_t command, uint16_t nargs, ...);
 void uart_SendCommand_dma (uint16_t command, uint16_t nargs, bool Tx_preloaded,  ...);
@@ -228,17 +202,3 @@ uint16_t uart_ReadResp();
 uint32_t uart_ReadResp32();
 void send_receiveSpectro (uint16_t command, uint16_t nargs, bool Tx_preloaded, ...);
 uint32_t print_Spectro_Data(uint16_t command_sent, uint16_t p_length);
-void GET_INTERFACE_PROTOCOL_VERSION();
-void Spectro_Setup();
-void Calibrate_Dark (uint32_t Exposure_time, uint32_t AVG_value);
-void Setup_mesure(Spectro* Sp);
-void test_spectro();
-void upscale_Dark();
-void upscale_Wavelengths();
-void upscale_RAW();
-int ComputeT();
-void init_Qneo();
-int Reload_Params();
-void Request_Reload();
-void Convert2_16FP(Spectro* Sp ,DAC_data* DAC);
-void reset_Qneo();

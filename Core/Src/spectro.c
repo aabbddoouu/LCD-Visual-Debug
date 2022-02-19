@@ -2,12 +2,9 @@
 #include <buttons.h>
 #include <menu.h>
 #include <parameters.h>
-#include <atomm_utils.h>
 #include <spi_sd.h>
 #include <stdarg.h>
-#include "AMS_AlgoDll.h"
-#include "AsterProcessing.h"
-#include <shutter.h>
+
 #include "lcd.h"
 
 #define SPECTRO_DEBUG   0

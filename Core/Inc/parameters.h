@@ -1,5 +1,4 @@
 #include <main.h>
-#include "atomm_utils.h"
 #include "ff.h"
 
 #define mount_SD(arg) f_mount(arg, "", 1)
@@ -19,13 +18,3 @@ void load_params_SD();
 void update_param_file(uint8_t ID);
 FRESULT scan_files (char* path);
 void load_language_pack();
-
-typedef struct{
-    FLOAT Temp_range;
-    FLOAT Em_range;
-    FLOAT Oxy_range; 
-    FLOAT Temp_min;
-    FLOAT Em_min;
-    FLOAT Oxy_min;
-    
-}DAC_params;

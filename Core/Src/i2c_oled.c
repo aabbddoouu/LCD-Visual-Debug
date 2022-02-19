@@ -77,14 +77,3 @@ void i2c_xfer7(uint32_t i2c, uint8_t addr, uint8_t command, uint8_t *w, size_t w
 }
 
 
-//Write line to oled (primitive)
-void write_update_oled(char * str){
-		ssd1306_Fill(Black);
-		ssd1306_SetCursor(2,10);
-		ssd1306_WriteString(str, Font_7x10, White);
-
-		ssd1306_UpdateScreen();
-}
-
-
-

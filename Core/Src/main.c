@@ -10,11 +10,8 @@
 #include "diskio.h"
 #include "ff.h"
 
-#include "AMS_AlgoDll.h"
-#include "AsterProcessing.h"
 #include <spi_sd.h>
 
-#include <shutter.h>
 #include <stm32_adafruit_lcd.h>
 
 #define INFINITY_64_UINT 	(uint64_t)(18446744073709551615)
@@ -30,13 +27,13 @@ extern gpiopin dac_fault1;
 extern gpiopin dac_fault2;
 extern bool new_card;
 extern int menu_status;
-extern int Gflg;
+
 extern volatile bool dma_busy;
 extern volatile uint64_t timeout_ticks;
 extern volatile uint32_t uart_timeout;
-extern FLOAT gLambda[LEN_PIX];
-extern int spectro_status[3];
-extern volatile Spectro Qneo;
+
+
+
 float temperature_inc =0;
 float tempo = 123.456;
 
@@ -51,9 +48,6 @@ char HUGE_BUFFER[HUGE_L];
 extern uint32_t volatile Tx7_buffer[TX7_LEN];
 extern uint32_t volatile Rx7_buffer[RX7_LEN];
 
-
-extern volatile FLOAT maxL1;
-extern volatile FLOAT maxL2;
 
 /////////////////////////////////////////////////////
 //// UART printf SECTION
@@ -195,19 +189,6 @@ void tim7_isr(){	//happens every time timer7 overflows
  	//if(timer_get_flag(TIM7,TIM_SR_UIF)){
 		ticks++;
 
-		//Timeout check
-		if(ticks>timeout_ticks && dma_busy){ 
-			timeout_ticks = UINT64_MAX; //(uint64_t)(18446744073709551615)
-			Qneo.Default=true;
-			//disable Rx/Tx DMA
-			dma_busy=false;
-			
-			dma_disable_stream(DMA1, DMA_STREAM0);
-			dma_disable_stream(DMA1, DMA_STREAM7);
-			spectro_status[0]=SPECTRO_DEFAULT;
-
-		}
-
 		//Periodic check if card is mounted : 1Hz
 		if(ticks%1000==0 ){
 			gpio_toggle(LED_GPIO,BLUE_LED);
@@ -265,21 +246,6 @@ void tim7_isr(){	//happens every time timer7 overflows
 
 
 			
-		}
-
-		//Periodic Request measurement : (10Hz default)
-		if(ticks%Qneo.MPeriod_ms==0/*ticks%1000==0*/){
-			if(spectro_status[0]==SPECTRO_IDLE){
-				spectro_status[1]=SPECTRO_CONFIG;
-
-				if(ticks%Qneo.CPeriod_ms==0){  //1h
-					spectro_status[1]=SPECTRO_CALIB;
-				}
-			}
-		}
-
-		if((ticks-button_ticks)>LCD_SLEEP_PERIOD && !DisplayLCD.TurnOFF_event){
-			DisplayLCD.TurnOFF_event=true;
 		}
 
 		
@@ -489,169 +455,10 @@ int main(){
 	setup_Spectro_usart();
 	init_uart_dma();
 
-
-	//while(1);
-
-SPECTRO_S:
-	Spectro_Setup();
-	if(Qneo.Default){
-		Display_Spectro(false);
-        uart_printf("Spectro Not found in setup ! Retrying ...\n");
-		Display_Status(menu_field[NOSP_ST_FIELD], LCD_COLOR_RED);
-		Qneo.Default=false;
-		//timeout_ticks=ticks+uart_timeout;
-		reset_Qneo();
-		delay_ms(2000);
-		goto SPECTRO_S;
-    }
-	Display_Spectro(true);
-	Display_Status(menu_field[SP_FOUND_FIELD], LCD_COLOR_BLACK);
-	upscale_Wavelengths();	//set Fdt too
-	delay_ms(1000);
-	uart_printf("Wavelengths extracted\n");
-/* 	
-	Calibrate_Dark(6000,10);
-	if(Qneo.Default){
-        uart_printf("Spectro Not found in 1st Calib ! MCU is halted\n");
-		while(1);
-	} */
-	
-	
-	//////////////////////////////////////////////////////////////////////////////
-	// Algo Initialization
-	if(Qneo.Aster){
-		status = InitAster(LEN_PIX, Qneo.Lambdas, "");
-		uart_printf("Aster init return status : %d\n", status);
-	}
-	else{
-		//		status=SetupPred(Qneo.Lambdas,"PSS_NewRef_Trans.csv", "gAspec.csv", "PSS_NewRef_Algo.csv");
-		status=SetupPred(Qneo.Lambdas,"Fdt_Qneo.txt", "gAspec.csv", "PSS_NewRef_Algo.csv");
-		uart_printf("Atomm init return status : %d\n", status);
-	}
-	//////////////////////////////////////////////////////////////////////////////
-
-	if(status!=0){
-		char status_str[35];
-		char status_arg[35];
-		strncpy(status_arg, "Algo Init Status : ", 35);
-		strncat(status_arg, "%d", 35);
-		snprintf(status_str, 35, status_arg, status);
-		Display_Status(status_str, LCD_COLOR_BLACK);
-		while(1);
-	}
-
 	delay_ms(1000);
 
 	
 
-/*	if(status==0){
-		asm("NOP");
-		start_us_count(&micro);
-		asm("NOP");
-		Program_Planck_flash();
-		asm("NOP");
-		stop_us_count(&micro);
-		asm("NOP");
-	}
-
-	uart_printf("Flash LogPlank program done in : %lu cycles\n", micro);
-*/
-
-/*
-	FLOAT planck[LEN_PIX];
-	int planck_T=500;
-
-	asm("NOP");
-	start_us_count(&micro);
-	asm("NOP");
-	get_LogPlanck(planck_T, planck);
-	asm("NOP");
-	stop_us_count(&micro);
-	asm("NOP");
-
-	uart_printf("Planck read in : %lu cycles\n", micro);
-	delay_ms(1000);
-	for (size_t i = 0; i < LEN_PIX; i++)
-	{
-		//uart_printf("Planck(%d)[%u] = %f\n",planck_T,i,planck[i]);
-	}
-	
-
-	FIL file_in,file_out;
-	FRESULT if_res,of_res,debug_res;
-	char* token_aster;
-	int Temp_aster=300,T_ref;
-	FLOAT lh=-1;
-	FLOAT spectra_aster[LEN_PIX];
-	volatile int TXD[1024];
-	
-	uint32_t xd=0;
-	int res=0;
-	int sampleID=1;
-
-	if_res=f_open(&file_in, "Trial_4-Phase_6-8ms.csv", FA_OPEN_EXISTING|FA_READ);
-
-
-	of_res=f_open(&file_out, "Trial_4-Phase_6-8ms_result.csv", FA_OPEN_EXISTING|FA_READ);	
-	
-
-
-	uart_printf("input file open res : %d\n", if_res);
-	uart_printf("output file open res : %d\n", of_res);
-
-	FLOAT s_mean=0;
-
-	uart_printf("Sample;Likelihood;Temp Algo;Temp file;LikeGMM;LikePCA\n");
-	for (size_t i = 1; i <=100; i++){
-
-		f_gets_debug(HUGE_BUFFER, HUGE_L, &file_in, &debug_res);
-		if(debug_res){
-			uart_printf("f_gets fail with result : %d\n", debug_res);
-		}
-		s_mean=0;
-		token_aster=strtok(HUGE_BUFFER,";");
-		for (size_t i = 0; i < LEN_PIX; i++)
-		{
-			token_aster=strtok(NULL, ";");
-			spectra_aster[i]=strtof(token_aster, NULL);
-			s_mean+=spectra_aster[i];
-		}
-
-		s_mean/=LEN_PIX;
-
-		//uart_printf("Spectra Mean = %f\n", s_mean);
-
-		//TXD[xd++]=strtol(HUGE_BUFFER, NULL, 10);
-
-		f_gets(HUGE_BUFFER, HUGE_L, &file_out);
-
-		T_ref=strtol(HUGE_BUFFER, NULL, 10);
-
-
-		for (size_t j = 0; j<1; j++) {
-				asm("NOP");
-				res = Process(8,spectra_aster,&Temp_aster, &lh);
-				asm("NOP");
-				
-				//uart_printf("Sample;Likelihood;Temp Algo;Temp file;LikeGMM;LikePCA\n");
-				uart_printf("%d;%f;%d;%d;%f;%f\n",i, lh, Temp_aster, T_ref, maxL1, maxL2);
-				//uart_printf("Sample %d : result :%d\nLH = %f - T = %d vs %d\n", i, res, lh, Temp_aster, T_ref);
-				//uart_printf("LikeGMM : %f - LikePCA : %f\n", maxL1, maxL2);
-		}
-		//uart_printf("\n");
-
-		//delay_ms(100);
-	}
-	
-	f_close(&file_in);
-	f_close(&file_out);
-
-	uart_printf("Done \n");
-	while (1);
-*/
-	Gflg=0;
-
-	Setup_mesure(&Qneo);
 	
 	start_us_count(&micro);
 	led_ticks=ticks+1000;
@@ -659,50 +466,13 @@ SPECTRO_S:
 	stop_us_count(&micro);
 
 	uart_printf("1sec = %d cycles\n", micro);
-	
-	setup_Servo();
 
-	uart_printf("Servo Setup\n");
-/*
-	timer_set_oc_value(TIM8, TIM_OC1, (20310*(40))/2000);
-	delay_ms(5000);
-	timer_set_oc_value(TIM8, TIM_OC1, (20310*(230))/2000);
-	while(1);
-*/
-
-	uart_timeout=UART_TIMEOUT_POST;
-	spectro_status[0]=SPECTRO_IDLE;
-	uint16_t data_dac=0;
-/* 
-	delay_ms(1000);
-	
-	close_shutter(0);
-
-	delay_ms(1000);
-
-	open_shutter(0);
-	 */
-
-	
-	Calibrate_Dark(Qneo.Ti,10);
-	Qneo.Calib_T=*(FLOAT*) &Rx7_buffer[5];
-
-	if(Qneo.Default){
-		Display_Spectro(false);
-        uart_printf("Spectro Not found in 1st Calib ! MCU is halted\n");
-		Display_Status(menu_field[NOSP_CL_FIELD], LCD_COLOR_RED);
-		while(1);
-	}
-
-	Reload_Params();
-
-	Display_Spectro(true);
 
     for(;;){
 		int k=0;
 
 		
-		spectro_thread();	//main thread 
+		//spectro_thread();	//main thread 
 		
 		//blink every 1 sec 
 		if(ticks-led_ticks>1000){	//used to visually check if the code is not frozen somewhere (trap loop, exception, periph failure ...)
@@ -710,15 +480,6 @@ SPECTRO_S:
 			gpio_toggle(GPIOB, GREEN_LED);
 			led_ticks=ticks;
 			test_ticks=ticks-test_ticks;
-
-			if(menu_status==MENU_IDLE){
-				char status_str[35];
-				char status_arg[35];
-				strncpy(status_arg, menu_field[RUN_FIELD], 35);
-				strncat(status_arg, "%.1fHz - @%dms", 35);
-				snprintf(status_str, 35, status_arg, 1000./Qneo.MPeriod_ms, Qneo.Ti_ms-1);
-				Display_Status(status_str, LCD_COLOR_BLACK);
-			}
 		}
 	}
 	return 0;

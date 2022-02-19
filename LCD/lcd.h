@@ -12,7 +12,6 @@
 #include <main.h>
 #include <lcd/ili9341/ili9341.h>
 #include <stm32_adafruit_lcd.h>
-#include "atomm_utils.h"
 
 #define LCD_SLEEP_PERIOD    1000*60
 

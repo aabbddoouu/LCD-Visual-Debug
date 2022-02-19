@@ -16,7 +16,6 @@
 #include <libopencm3/stm32/i2c.h>
 #include <libopencm3/cm3/nvic.h>
 #include <libopencm3/stm32/exti.h>
-#include "ssd1306.h"
 #include <math.h>
 #include <limits.h>
 #include <libopencm3/cm3/systick.h>

@@ -18,7 +18,6 @@ extern int16_t param_count;
 extern parameter param_list[MAX_PARAMS];
 extern lang language[MAX_LANG];
 extern Display DisplayLCD;
-extern volatile Spectro Qneo;
 //extern char SD_buffer[LINE_SD_BUFFER];
 
 int menu_status=MENU_IDLE;	//contains the current menu state

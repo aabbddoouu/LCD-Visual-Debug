@@ -4,7 +4,6 @@
 #include "parameters.h"
 
 extern char menu_field[MENU_FIELDS][Line_Max_Char]; 
-extern DAC_params AD420_params;
 extern parameter param_list[MAX_PARAMS];
 extern int16_t max_chunck;
 extern uint8_t desc_pnt[DESC_length_M/10];

@@ -22,7 +22,6 @@ FRESULT fresult;
 
 parameter param_list[MAX_PARAMS];
 lang language[10];
-DAC_params AD420_params;
 
 char SD_buffer[LINE_SD_BUFFER];
 
