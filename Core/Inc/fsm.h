@@ -1,7 +1,7 @@
 #pragma once
 
 #include <main.h>
-
+#include "ff.h"
 
 //Menu States
 #define MENU_NEWSD       -1  
@@ -56,7 +56,15 @@
 #define Char_per_line   (ILI9341_LCD_PIXEL_WIDTH-20)/11
 //Upper bound for lines needed to show description 
 
-#define DEFAULT_LANG    "english"
+#define MAX_PARAMS      30
+#define LINE_SD_BUFFER  1024 
+
+#define FILE_FORMAT ".csv"
+
+void load_params_SD();
+void update_param_file(uint8_t ID);
+FRESULT scan_files (char* path);
+
 
 /**
  * @brief 
@@ -109,7 +117,7 @@ typedef struct parameter_menu
 
 void show_param(parameter_menu* param);
 void show_temperature(float T);
-void menu_thread();
+void lcd_thread();
 void show_param_menu();
 void setup_params();
 void show_language_menu();
@@ -121,7 +129,6 @@ void bound_check(parameter_menu* param);
 float char2float(parameter_menu* param);
 void decrease_digit(parameter_menu* param);
 void increcrease_digit(parameter_menu* param);
-void write_update_oled_menu(parameter_menu* param, uint16_t curX, uint16_t curY);
 
 
 char* get_menu_field(int i);

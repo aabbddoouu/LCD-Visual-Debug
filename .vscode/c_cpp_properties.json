@@ -4,6 +4,7 @@
             "name": "STM32",
             "includePath": [
                 "../libopencm3-master/include",
+                "../libopencm3-master/include/libopencmsis",
                 "../libopencm3-master/lib/stm32/f7",
                 "../libopencm3-master/lib/stm32",
                 "../libopencm3-master/lib/stm32/common",
@@ -12,16 +13,12 @@
                 "../libopencm3-master/include/libopencm3/stm32",
                 "../libopencm3-master/lib/cm3",
                 "../STMems_Standard_C_drivers",
-                "../SSD1306/ssd1306", //path to the arm toolchain patched by ST
-                "D:/Programs/STM32CubeIDE_1.4.0/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.9-2020-q2-update.win32_1.5.0.202011040924/tools/arm-none-eabi/include",
-                "D:/Programs/STM32CubeIDE_1.4.0/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.externaltools.gnu-tools-for-stm32.9-2020-q2-update.win32_1.5.0.202011040924/tools/lib/gcc/arm-none-eabi/9.3.1/include",
+                "../SSD1306/ssd1306",
+                "D:/VSARM/armcc/arm-none-eabi/include",
+                "D:/VSARM/armcc/bin",
                 "Core/Inc",
                 "fatfs",
-                "Atomm_src",
-                "Aster_src",
                 "LCD",
-                "Aster_src/GMM",
-                "Aster_src/PCA",
                 "fatfs/drivers",
                 "fatfs/option"
             ],
@@ -33,8 +30,9 @@
                 "STM32F7xx",
                 "STM32F767ZI"
             ],
-            "compilerPath": null,
-            "cStandard": "c99"
+            "compilerPath": null,   
+            "cStandard": "c99",
+            "configurationProvider": "ms-vscode.makefile-tools"
         }
     ],
     "version": 4

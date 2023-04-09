@@ -1,7 +1,5 @@
-#include "parameters.h"
-#include "menu.h"
+#include <fsm.h>
 //fatfs lib
-
 #include "diskio.h"
 
 
@@ -21,7 +19,7 @@ FIL fil,fil_copy;
 FRESULT fresult;
 
 parameter param_list[MAX_PARAMS];
-lang language[10];
+
 
 char SD_buffer[LINE_SD_BUFFER];
 
@@ -117,15 +115,6 @@ void load_params_SD(){
 		if (SD_buffer!= NULL && param_count==MAX_PARAMS) uart_printf("Max param count reached !\n");
 		f_close(&fil);
 		
-		AD420_params.Temp_range	=param_list[1].value-param_list[0].value;
-		AD420_params.Temp_min	=param_list[0].value;
-		
-		AD420_params.Oxy_range	=param_list[3].value-param_list[2].value;
-		AD420_params.Oxy_min	=param_list[2].value;
-
-		AD420_params.Em_range	=param_list[5].value-param_list[4].value;
-		AD420_params.Em_min		=param_list[4].value;
-
 	}
 	
 }
@@ -156,7 +145,7 @@ void update_param_file(uint8_t ID){
 	//copy from line 1 (1st line being line with header text) to line ($ID-1)
 //////////////////////////////////////////////////////
 
-//Section 1 : R/W files : 19ms @27MHz
+//Section 2 : R/W files : 19ms @27MHz
 //////////////////////////////////////////////////////
 	//sd_ticks=ticks-sd_ticks;
 	//sd_ticks=ticks;
@@ -213,7 +202,8 @@ void update_param_file(uint8_t ID){
 	uart_printf("Sprintf cycles : %d = %d us\n",(uint32_t) micros, (uint32_t)micros/108);
 	//delay_ms(10);
 	//uart_printf("Time made to format line file : %d ms\n",sprint_ticks);
-	}
+
+}
 
 /**
  * @brief Scan lang files from SD
@@ -244,8 +234,8 @@ FRESULT scan_files (char* path){
             } else {                                       /* It is a file. */
                 char* token;
 				token=strtok(fno.fname,".");
-				language[lang_count].ID=lang_count;
-				strcpy(language[lang_count].name,token);
+				//language[lang_count].ID=lang_count;
+				//strcpy(language[lang_count].name,token);
 				lang_count++;
 				//uart_printf("%s\n", language[lang_count++].name);
 				//delay_ms(100);
@@ -257,47 +247,3 @@ FRESULT scan_files (char* path){
 
     return res;
 }
-
-/**
- * @brief Load Language related fields
- * 
- */
-void load_language_pack(){
-	/* open currently selected lang file */
-	//char full_path[50];
-	int i=0;
-	
-	strcpy(SD_buffer,LANG_DIR_FILE);
-	strcat(SD_buffer,language[curr_lang].name);
-	strcat(SD_buffer,FILE_FORMAT);
-	//strcat(full_path,"\n");
-	//uart_printf(full_path);
-	fresult=f_open(&fil,SD_buffer, FA_OPEN_EXISTING | FA_READ);
-	//strncpy(SD_buffer,"",1);
-	
-	//uart_printf("open result : %d\n",fresult);
-	while (f_gets(SD_buffer,LINE_SD_BUFFER,&fil) != 0)
-	{	
-		if (strlen(SD_buffer)<3){ 
-			//when an empty line is read it break and read param desc
-			break;
-		}
-		strcpy(menu_field[i],strtok(SD_buffer,";"));
-		i++;
-	}
-	
-	for (i = 0; i < param_count; i++)
-	{
-		if(f_gets(SD_buffer,LINE_SD_BUFFER,&fil) != 0){
-			strcpy(param_list[i].name,strtok(SD_buffer,";"));
-			//strcpy(SD_buffer, strtok(NULL,";"));
-			strcpy(param_list[i].description,strtok(NULL,"\n"));
-		}
-		else
-		{
-			uart_printf("ERROR \n");
-		}
-		
-	}
-	f_close(&fil);
-}	

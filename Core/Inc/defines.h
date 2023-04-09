@@ -10,3 +10,5 @@
 
 //Show text as ASCII in the screen
 #define USE_ASCII
+
+typedef double FLOAT;

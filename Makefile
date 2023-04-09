@@ -16,7 +16,7 @@
 MAIN = main
 
 ######################################
-# target
+# target.
 ######################################
 TARGET = LCD_debug
 
@@ -27,7 +27,7 @@ TARGET = LCD_debug
 # debug build?
 DEBUG = 1
 # optimization	: O0 - O1 - Og - Os - O2 - O3
-OPT = -Os -falign-functions -falign-jumps -falign-labels  -falign-loops -freorder-blocks-algorithm=stc
+OPT = -Og #-freorder-blocks-algorithm=stc -falign-loops -falign-labels -falign-jumps -falign-functions
 #-fprefetch-loop-arrays is the one fucking up the program when using O2 or higher (O3 & Ofast) 
 
 #######################################
@@ -43,13 +43,13 @@ BUILD_DIR = build
 C_SOURCES =  \
 Core/Src/$(MAIN).c \
 Core/Src/printf.c \
-Core/Src/buttons.c \
-Core/Src/menu.c \
-Core/Src/spectro.c \
-Core/Src/parameters.c \
-Core/Src/shutter.c \
 Core/Src/lcd_.c \
 Core/Src/spi_sd.c \
+Core/Src/i2c_oled.c \
+Core/Src/current.c \
+Core/Src/buttons.c \
+Core/Src/parameters.c \
+Core/Src/fsm.c \
 fatfs/drivers/fatfs_sd.c \
 fatfs/option/syscall.c \
 fatfs/diskio.c \
@@ -64,6 +64,10 @@ LCD/Fonts/font16.c \
 LCD/Fonts/font20.c \
 LCD/Fonts/font24.c \
 bitmap.c \
+ssd1306/ssd1306_fonts.c \
+ssd1306/ssd1306.c \
+ssd1306/ssd1306_tests.c \
+OV2640/ov2640.c
 #fatfs/option/ccsbcs.c
 
 
@@ -130,6 +134,7 @@ AS_INCLUDES = \
 # C includes
 C_INCLUDES =  \
 -I../libopencm3-master/include \
+-I../libopencm3-master/include/libopencmsis \
 -I../libopencm3-master/include/libopencm3/stm32 \
 -I../libopencm3-master/include/libopencm3/stm32/common \
 -I../libopencm3-master/include/libopencm3/stm32/f7 \
@@ -141,7 +146,8 @@ C_INCLUDES =  \
 -ILCD\Fonts \
 -ILCD\stm32f7xx \
 -Ifatfs/drivers \
--I../SSD1306/ssd1306 \
+-Issd1306 \
+-IOV2640 \
 -IDrivers/CMSIS/Include
 
 
@@ -156,8 +162,8 @@ CFLAGS += -g -gdwarf-2
 endif
 
 
-# Generate dependency information
-CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
+# Generate dependency information (Removed warning)
+CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)" -w
 
 CXXFLAGS?=
 CXXFLAGS += -feliminate-unused-debug-types

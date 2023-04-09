@@ -13,7 +13,7 @@
 #include <lcd/ili9341/ili9341.h>
 #include <stm32_adafruit_lcd.h>
 
-#define LCD_SLEEP_PERIOD    1000*60
+#define LCD_SLEEP_PERIOD    1000*10
 
 
 #define OVERLAY_MIDDLE_Y1	106
@@ -80,6 +80,8 @@ typedef struct
 #define LCD             ((lcd_fmc_address_t*)SRAM_SECTOR1)
 
 
+void init_display_struct();
+
 /* Link function for LCD peripheral (modified) */
 
 //-----------------------------------------------------------------------------
@@ -106,36 +108,11 @@ void     LCD_IO_ReadCmd16MultipleData8(uint16_t Cmd, uint8_t *pData, uint32_t Si
 void     LCD_IO_ReadCmd16MultipleData16(uint16_t Cmd, uint16_t *pData, uint32_t Size, uint32_t DummySize);
 void     LCD_IO_ReadCmd16MultipleData24to16(uint16_t Cmd, uint16_t *pData, uint32_t Size, uint32_t DummySize);
 
+void     LCD_IO_test();
+
 /* User defined */
 
 //-----------------------------------------------------------------------------
-void Draw_Overlay();
-void Update_Graph(FLOAT value);
-void Draw_Graph_Axis();
-void Scale_Graph(uint32_t max_v, uint32_t min_v);
-void Display_Status(const char* str, uint16_t Color);
-void Display_DAC1(bool status);
-void Display_DAC2(bool status);
-void Display_Card(bool status);
-void Display_Spectro(bool status);
-void Clear_Page();
-void Select_Page();
-
-void Draw_Select_Param();
-void Select_Param(int16_t index);
-
-void Draw_Config_Param();
-void Config_Param();
-
-void Draw_Select_Lang();
-void Select_Lang(int16_t index);
-void Cant_Load_Lang();
-
-void Save_Param();
-void Cant_Save_Param();
-void Save_Param_Succ();
-
-void Update_Temperature(FLOAT value);
 
 
 

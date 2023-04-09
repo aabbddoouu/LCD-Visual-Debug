@@ -1,12 +1,9 @@
 #include <main.h>
-#include <menu.h>
 #include <buttons.h>
-#include <spectro.h>
 #include "fatfs_sd.h"
 #include <libopencm3/cm3/scb.h>
 #include "lcd.h"
-
-#include "parameters.h"
+#include <fsm.h>
 #include "diskio.h"
 #include "ff.h"
 
@@ -14,13 +11,19 @@
 
 #include <stm32_adafruit_lcd.h>
 
+#include "ov2640.h"
+
 #define INFINITY_64_UINT 	(uint64_t)(18446744073709551615)
 
-extern uint8_t image_logo[ILI9341_LCD_PIXEL_HEIGHT*ILI9341_LCD_PIXEL_WIDTH*2];
+
+extern int button_status;
+
 extern gpiopin LCD_DrvE;
 extern Display DisplayLCD;
 extern volatile uint64_t button_ticks;
-extern char menu_field[MENU_FIELDS][Line_Max_Char]; 
+
+extern ADC_H ADC_Handler;
+
 extern bool card_mounted;
 extern gpiopin card_detect;
 extern gpiopin dac_fault1;
@@ -32,7 +35,9 @@ extern volatile bool dma_busy;
 extern volatile uint64_t timeout_ticks;
 extern volatile uint32_t uart_timeout;
 
+extern const uint8_t dofus[153600];
 
+extern volatile ov2640 Camera;
 
 float temperature_inc =0;
 float tempo = 123.456;
@@ -41,12 +46,16 @@ FATFS FatFs_main;
 FIL file_main;
 FRESULT fresult_main;
 
+bool card_mounted=false;
+gpiopin card_detect={GPIOG,GPIO2};
+
 #define 	HUGE_L	4096
 char HUGE_BUFFER[HUGE_L];
 
+RTC Clock = {0,00,00,00};
 
-extern uint32_t volatile Tx7_buffer[TX7_LEN];
-extern uint32_t volatile Rx7_buffer[RX7_LEN];
+//extern uint32_t volatile Tx7_buffer[TX7_LEN];
+//extern uint32_t volatile Rx7_buffer[RX7_LEN];
 
 
 /////////////////////////////////////////////////////
@@ -105,7 +114,7 @@ static void clock_setup(void)
 	/* Enable syscfg for exti port mapping */
 	rcc_periph_clock_enable(RCC_SYSCFG);
 
-	nvic_set_priority(NVIC_HARD_FAULT_IRQ, 0);
+	//nvic_set_priority(NVIC_HARD_FAULT_IRQ, 0);
 
 	nvic_enable_irq(NVIC_HARD_FAULT_IRQ);
 }
@@ -114,6 +123,21 @@ void hard_fault_handler(){
 	//Request SW reset
 	SCB_AIRCR = SCB_AIRCR_VECTKEY | SCB_AIRCR_SYSRESETREQ;
 }
+
+void init_MCO1(void) {
+	rcc_set_mco(RCC_CFGR_MCO1_HSI);
+
+	uint32_t reg32;
+
+	reg32 = RCC_CFGR;
+	reg32 &= ~(RCC_CFGR_MCOPRE_MASK << RCC_CFGR_MCO1PRE_SHIFT);
+	RCC_CFGR = (reg32 | (RCC_CFGR_MCOPRE_DIV_NONE << RCC_CFGR_MCO1PRE_SHIFT)); //mco1 = 16MHz
+
+	gpio_mode_setup(GPIOA, GPIO_MODE_AF, GPIO_PUPD_NONE, GPIO8); //PA8
+	gpio_set_af(GPIOA, GPIO_AF0, GPIO8); //MCO1
+
+}
+
 
 void init_usart(void) {
 
@@ -142,14 +166,14 @@ void init_usart(void) {
 
 static void gpio_setup(void)
 {
-	/* Set GPIOB0 LED to 'output' */
-	gpio_mode_setup(LED_GPIO, GPIO_MODE_OUTPUT,
-		      GPIO_PUPD_NONE, RED_LED|GREEN_LED|BLUE_LED);
-
+	//LEDs GPIOs
+	gpio_mode_setup(LED_GPIO, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, RED_LED|GREEN_LED|BLUE_LED);
 	gpio_set_output_options(GPIOB, GPIO_OTYPE_PP, GPIO_OSPEED_2MHZ, RED_LED|GREEN_LED|BLUE_LED);
 
-	gpio_mode_setup(GPIOC, GPIO_MODE_INPUT,
-		      GPIO_PUPD_PULLUP, GPIO13);
+	gpio_mode_setup(GPIOC, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP, GPIO13);
+
+	gpio_mode_setup(card_detect.port,GPIO_MODE_INPUT,GPIO_PUPD_PULLUP,(uint16_t)card_detect.pin);
+
 }
 
 
@@ -166,7 +190,7 @@ void delay_setup(void)
 	rcc_periph_clock_enable(RCC_TIM7);
 	/* microsecond counter */
 	timer_set_prescaler(TIM7, 108); //TIMx are clocked by 2*apbx ; increment each 1us
-	timer_set_period(TIM7,1000); //OF each ms
+	timer_set_period(TIM7,1006); //OF each ms
 	timer_continuous_mode(TIM7);
 	//timer_update_on_overflow(TIM7);
 	nvic_set_priority(NVIC_TIM7_IRQ,0b01000000);
@@ -180,74 +204,43 @@ void delay_setup(void)
 	timer_set_prescaler(TIM5, 0);
 	timer_set_period(TIM5,0xFFFFFFFF);
 	timer_one_shot_mode(TIM5);
+
+	rcc_periph_clock_enable(RCC_TIM3);
+	timer_set_prescaler(TIM3, 81); //1 ticks = 1us
+	timer_set_period(TIM3,0xFFFF);
+	timer_one_shot_mode(TIM3);
 	
 
 }
 
 void tim7_isr(){	//happens every time timer7 overflows
 	timer_clear_flag(TIM7,TIM_SR_UIF);
- 	//if(timer_get_flag(TIM7,TIM_SR_UIF)){
-		ticks++;
+ 	//if(timer_get_flag(TIM7,TIM_SR_UIF)){ //Dont need it since it's the only src of the interrupt
+	ticks++;
 
-		//Periodic check if card is mounted : 1Hz
-		if(ticks%1000==0 ){
-			gpio_toggle(LED_GPIO,BLUE_LED);
+	//Periodic check if card is mounted : 1Hz
+	if(ticks%1000==0){
 
-			if(gpio_get(card_detect.gpio,card_detect.pin)){ //card_mounted is the previous state so now its unmounted
-				if(card_mounted){	
-					gpio_clear(LED_GPIO,RED_LED);
-					card_mounted=false;
-					menu_status=MENU_NEWSD;
-					new_card=true;
-					unmount_SD();
-					Display_Card(false);
-				}
+		Clock.Seconds++;
+
+		if(!gpio_get(card_detect.port,card_detect.pin)){ //card_mounted is the previous state so now its unmounted
+			gpio_clear(LED_GPIO,RED_LED);
+			card_mounted=false;
+			unmount_SD();
+			//tell the server that the SD is removed
 			}
-			else if(new_card){	//now its mounted
-				gpio_set(LED_GPIO,RED_LED);
-				card_mounted=true;
-				new_card=false;
-				menu_status=MENU_IDLE;
-				mount_SD(&FatFs_main);
-				Display_Card(true);
-			}
-
-
-			if(!gpio_get(dac_fault1.gpio,dac_fault1.pin)){
-				//dac fault1
-				if (!dac1_wasopen){
-					Display_DAC1(false);
-					dac1_wasopen=true;
-				}
-
-			}
-			else{
-				if (dac1_wasopen){
-					Display_DAC1(true);
-					dac1_wasopen=false;
-				}
-			}
-
-			
-			if(!gpio_get(dac_fault2.gpio,dac_fault2.pin)){
-				//dac fault2
-				if (!dac2_wasopen){
-					Display_DAC2(false);
-					dac2_wasopen=true;
-				}
-
-			}
-			else{
-				if (dac2_wasopen){
-					Display_DAC2(true);
-					dac2_wasopen=false;
-				}
-			}
-
-
-			
+		else if(!card_mounted){
+			gpio_clear(LED_GPIO,RED_LED);
+			card_mounted=true;
+			mount_SD(&FatFs_main); //Need a better way to do this
 		}
-
+	
+    /*
+		if((ticks-button_ticks)>LCD_SLEEP_PERIOD){
+			DisplayLCD.TurnOFF_event=true;
+		}
+	*/ 
+	}
 		
 }
 
@@ -265,7 +258,7 @@ void stop_us_count(uint32_t *c){
 /**
  * @brief 
  * Blocking delay using Timer 6 in oneshot mode.
- * Dont use delay after main setup, unless you're debuging
+ * Dont use delay after the main setup, unless you're debuging
  * @param ms no more than 1<<16
  */
 void delay_ms(uint16_t ms)	
@@ -277,6 +270,19 @@ void delay_ms(uint16_t ms)
 }
 
 
+/**
+ * @brief 
+ * Blocking delay using Timer 3 in oneshot mode.
+ * Dont use delay after the main setup, unless you're debuging
+ * @param us no more than ?
+ */
+void delay_us(uint16_t us)	
+{
+	TIM_ARR(TIM3) = us;
+	TIM_EGR(TIM3) = TIM_EGR_UG;
+	timer_enable_counter(TIM3);
+	while (TIM_CR1(TIM3) & TIM_CR1_CEN);
+}
 
 
 
@@ -350,129 +356,148 @@ int main(){
 	delay_setup();
     gpio_setup();
     init_usart();
-	config_fields();
+	oled_setup();
+	setup_current_M();
+	//config_fields();
 	buttons_setup();
-	LCD_Init();
+	uint8_t ret;
+	ret = LCD_Init();
+	init_display_struct();
 	//////////////////////////
 	SD_FATFS_InitPins();
 	/////////////////////////
+	init_MCO1();
+
+    
+	OV2640_Init(CAM_320x240);
 
 	uart_printf("starting... %f\n", tempo);
+	uart_printf("LCD INIT returns :  %d\n", ret);
 
+	
 	// Display ///////////////////////////////////////////
-	Draw_Overlay();
-	Draw_Graph_Axis();
 	////////////////////////////////////////////////
 	delay_ms(1000);
-	
+
 
 	//timer_problem=timer_get_counter(TIM5);
 	//ssd1306_TestFPS();
 
 	//////////////////
+	
 	//Check if SD is mounted
-	if (!gpio_get(card_detect.gpio,card_detect.pin)){ //0=low=mounted
+	if (gpio_get(card_detect.port,card_detect.pin)){ //0=low=mounted
 		card_mounted=true;
 		gpio_set(LED_GPIO,RED_LED);
-		Display_Card(true);
 		//uart_printf("found card\n");
 	
-	}	
+	}
+MOUNT:	;		
 	fresult_main=mount_SD(&FatFs_main);
+	uart_printf("Mount Result = %d\n", fresult_main);
 	if(fresult_main!=FR_OK){
-		Display_Card(false);
-		Display_Status(menu_field[INSERTSD_FIELD], LCD_COLOR_RED);
-		while (gpio_get(card_detect.gpio,card_detect.pin)){
+		while (!gpio_get(card_detect.port,card_detect.pin)){
 			delay_ms(1000);
 		}
+		delay_ms(1000);
 		card_mounted=true;
-		new_card=false;
 		gpio_set(LED_GPIO,RED_LED);
-		
-		delay_ms(1000);	
-		
+		goto MOUNT;
 	}
 	else{
 		card_mounted=true;
 		gpio_set(LED_GPIO,RED_LED);
-		new_card=false;
 	}
 
-	Display_Card(true);
-	// Load all parameters
-	load_params_SD();
-	// Scan for language packs
-	scan_files(LANG_DIR);
-	// Load the 1st language pack : English generally
-	load_language_pack();
 
-	// init Qneo struct
-	init_Qneo();
-
-	//Reload all measurmement parameter before to take into account the algorithm chosen
-	Reload_Params();
-	delay_ms(1000);
+	
 	//////////////////
+	
+	f_open(&file_main, "Camera_Nucleo.txt", FA_CREATE_NEW|FA_WRITE);
+	f_printf(&file_main, "this is a test @ 23:03 10/05/2022");
+	f_close(&file_main);
 
-	enable_button_EXTI();	//start aquiring input after setup
+	
 
-
+	
 
 	
 	char* token_main;
 	char* token_main2;
 	int status;
 
-
-	if(!gpio_get(dac_fault1.gpio,dac_fault1.pin)){
-		dac1_wasopen=true;
-		Display_DAC1(false);
-	}
-	else{
-		dac1_wasopen=false;
-		Display_DAC1(true);
-	}
-
-	if(!gpio_get(dac_fault2.gpio,dac_fault2.pin)){
-		dac2_wasopen=true;
-		Display_DAC2(false);
-	}
-	else{
-		dac2_wasopen=false;
-		Display_DAC2(true);
-	}
-
 	//enable timer7 after setup is done (for safety)
 	timer_enable_irq(TIM7,TIM_DIER_UIE);
 	timer_enable_counter(TIM7);
 
 	///////////////////////////
-	
+	asm("NOP");
+	uint64_t ticks1=ticks;
+	asm("NOP");
+	delay_us(1000);
+	asm("NOP");
+	uint64_t ticks2=ticks-ticks1;
+	asm("NOP");
+	uart_printf("1000 us ticks = %d\n", (uint32_t) ticks2);
 	///////////////////////////
 	
 
-	init_DAC_spi();
-	setup_Spectro_usart();
-	init_uart_dma();
+	//init_uart_dma();
 
-	delay_ms(1000);
-
-	
-
-	
 	start_us_count(&micro);
 	led_ticks=ticks+1000;
 	while(ticks<led_ticks);
 	stop_us_count(&micro);
 
 	uart_printf("1sec = %d cycles\n", micro);
+	
+	
+	start_us_count(&micro);
+	asm("NOP");
+	LCD_DrawRGB16Image8(0,0,240,320, dofus); //242,294 
+	asm("NOP");
+	stop_us_count(&micro);
 
+	uart_printf("frame period = %d ms\n",  micro/109000);
+	//LCD_IO_test();
+	ssd1306_Init();
+	delay_ms(1000);
+	update_time_oled("Up 0d-00h-00m-00s");
+	update_status_oled("Status : Idle");
+	update_current_oled("Current : 0 mA");
+	update_test_oled("this is a test");
+	
+	
+	char oled_line[20];
+	bool first_conv=true;
 
+	enable_button_EXTI();	//start aquiring input after setup
+    uint32_t fps=0;
     for(;;){
 		int k=0;
 
 		
-		//spectro_thread();	//main thread 
+		lcd_thread();	//main thread 
+		if(!Camera.isCapturing && !Camera.CaptureDone ){
+            cringe_function();
+            asm("NOP");
+			CAM_CAPTURE1FRAME(Camera);
+            asm("NOP");
+            dma_enable_stream(DMA2, DMA_STREAM1); //is it needed or does it trigger automatically ????
+            asm("NOP");
+            DCMI_CR |= DCMI_CR_CAPTURE;
+            asm("NOP");
+		}
+
+		if(Camera.CaptureDone){
+            fps++;
+			start_us_count(&micro);
+			asm("NOP");
+			LCD_DrawRGB16Image8(0,0,240,320, Camera.RGB565); //242,294 
+			asm("NOP");
+			stop_us_count(&micro);
+            Camera.CaptureDone=false;
+		}
 		
 		//blink every 1 sec 
 		if(ticks-led_ticks>1000){	//used to visually check if the code is not frozen somewhere (trap loop, exception, periph failure ...)
@@ -480,6 +505,116 @@ int main(){
 			gpio_toggle(GPIOB, GREEN_LED);
 			led_ticks=ticks;
 			test_ticks=ticks-test_ticks;
+			
+			
+			switch (button_status)
+			{
+			case NO_BUTTON_EVENT:
+				update_status_oled("Status : No Button");
+				break;
+
+			case UP_BUTTON_EVENT:
+				update_status_oled("Status : Up");
+				break;
+
+			case DOWN_BUTTON_EVENT:
+				update_status_oled("Status : Down");
+				break;
+
+			case RIGHT_BUTTON_EVENT:
+				update_status_oled("Status : Right");
+				break;
+
+			case LEFT_BUTTON_EVENT:
+				update_status_oled("Status : Left");
+				break;
+
+			case ENTER_BUTTON_EVENT:
+				update_status_oled("Status : Enter");
+				break;
+
+			case RETURN_BUTTON_EVENT:
+				update_status_oled("Status : Return");
+				break;
+			
+			default:
+				update_status_oled("Status : ERROR!");
+				break;
+			}
+
+
+			if(Clock.Seconds>=60){
+				Clock.Seconds%=60;
+				Clock.Minutes++;
+			}
+			if(Clock.Minutes>=60){
+				Clock.Minutes=0;
+				Clock.Hours++;
+			}
+			if(Clock.Hours>=24){
+				Clock.Hours=0;
+				Clock.Days++;
+			}
+
+			sprintf_(oled_line, "Up %dd-%.2dh-%.2dm-%.2ds",Clock.Days, Clock.Hours, Clock.Minutes, Clock.Seconds);
+			update_time_oled(oled_line);
+			
+			if(ADC_Handler.Update_C){
+				if(first_conv){
+					first_conv=false;
+
+					for (size_t i = 0; i < ADC_FILTER_LENGHT; i++)
+					{
+						ADC_Handler.FilterAVG[i]+=ADC_Handler.Current_f;
+						ADC_Handler.V0AVG[i]+=ADC_Handler.V0_f;
+					}
+				}
+
+				(++(ADC_Handler.Filter_index) >= ADC_FILTER_LENGHT) ? ADC_Handler.Filter_index=0 : false;
+				ADC_Handler.FilterAVG[ADC_Handler.Filter_index]=ADC_Handler.Current_f;
+				ADC_Handler.V0AVG[ADC_Handler.Filter_index]=ADC_Handler.V0_f;
+
+				ADC_Handler.Current_f=0;
+				ADC_Handler.V0_f=0;
+
+
+				for (size_t i = 0; i < ADC_FILTER_LENGHT; i++)
+				{
+					ADC_Handler.Current_f+=ADC_Handler.FilterAVG[i];
+					ADC_Handler.V0_f+=ADC_Handler.V0AVG[i];
+				}
+				ADC_Handler.Current_f/=ADC_FILTER_LENGHT;
+				ADC_Handler.V0_f/=ADC_FILTER_LENGHT;
+
+
+				uint32_t it = (uint32_t) ADC_Handler.Current_f;
+				ADC_Handler.Current_f-=ADC_Handler.V0_f;
+				ADC_Handler.Current_f*=3300;
+				ADC_Handler.Current_f/=4096;
+
+				if(ADC_Handler.Current_f<0){
+					ADC_Handler.Current=0;
+				}
+
+				ADC_Handler.Current_f*=10;
+				ADC_Handler.Current_f/=4;
+				ADC_Handler.Current=(uint32_t) ADC_Handler.Current_f;
+				uint32_t v0 = (uint32_t) ADC_Handler.V0_f;
+
+				sprintf_(oled_line, "Current : %dmA",ADC_Handler.Current);
+				update_current_oled(oled_line);
+				sprintf_(oled_line, "FPS : %d", fps);
+				update_test_oled(oled_line);
+				ADC_Handler.Update_C=false;	
+			}
+			else{
+				adc_start_conversion_regular(ADC_CURRENT);
+
+			}
+
+			ssd1306_UpdateScreen();
+
+			fps=0;
 		}
 	}
 	return 0;

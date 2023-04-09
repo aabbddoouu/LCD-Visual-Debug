@@ -1,14 +1,6 @@
 #include <lcd.h>
-#include"menu.h"
 
-#include "parameters.h"
-
-extern char menu_field[MENU_FIELDS][Line_Max_Char]; 
-extern parameter param_list[MAX_PARAMS];
-extern int16_t max_chunck;
-extern uint8_t desc_pnt[DESC_length_M/10];
-extern parameter_menu dummyParam;
-extern lang language[MAX_LANG];
+extern uint8_t image_leo[153600];
 
 Graph TGraph;
 Display DisplayLCD;
@@ -82,9 +74,8 @@ void Display_Status(const char* str, uint16_t Color){
 
 }
 
-void Draw_Overlay(){
-
-    DisplayLCD.Background_color=LCD_COLOR_WHITE;
+void init_display_struct(){
+	DisplayLCD.Background_color=LCD_COLOR_WHITE;
     DisplayLCD.Font_Default=&Font12_7;
     DisplayLCD.Font_Temperature=&Font24_17;
     DisplayLCD.Graph_color=LCD_COLOR_MAGENTA;
@@ -97,12 +88,11 @@ void Draw_Overlay(){
 	DisplayLCD.Page_transition = true;
 	DisplayLCD.TurnOFF_event = false;
 	DisplayLCD.TurnON_event = false;
+}
 
-    TGraph.min_value=(uint32_t) AD420_params.Temp_min;
-    TGraph.range=(uint32_t) AD420_params.Temp_range;
-    TGraph.max_value=TGraph.min_value+TGraph.range;
-    TGraph.max_value_inSET=TGraph.min_value;
-    TGraph.min_value_inSET=TGraph.max_value;
+void Draw_Overlay(){
+
+    init_display_struct();
 
     for (size_t i = 0; i < GRAPH_PIXELS_XRANGE; i++)
     {
@@ -119,7 +109,7 @@ void Draw_Overlay(){
 	asm("NOP");
 	//LCD_DrawRGB16Image8(0,0,ILI9341_LCD_PIXEL_WIDTH, ILI9341_LCD_PIXEL_HEIGHT, image);
 	//LCD_DrawRGB16Image8(4,1,231, 308, image_pinker);
-	//LCD_DrawRGB16Image8(0,0,ILI9341_LCD_PIXEL_WIDTH, ILI9341_LCD_PIXEL_HEIGHT, image_logo);
+	//LCD_DrawRGB16Image8(0,0,ILI9341_LCD_PIXEL_WIDTH, ILI9341_LCD_PIXEL_HEIGHT, image_leo);
 	LCD_Clear(DisplayLCD.Background_color);
 	asm("NOP");
 	stop_us_count(&image_count);
@@ -155,9 +145,6 @@ void Draw_Overlay(){
 
 	// 2nd stripe
 
-	Display_Status(menu_field[BOOT_FIELD], LCD_COLOR_BLACK);
-
-	LCD_DisplayStringAt(8, 58, menu_field[Temp_FIELD], LEFT_MODE);
 	LCD_DrawHLine(87, 65,150);
 	LCD_DrawVLine(87+150, 65, 40);
 	LCD_DrawHLine(3, 65+40, 87+150-3);
@@ -207,9 +194,6 @@ void Select_Graph_tab(){
 	LCD_FillRect(157, 301, 82,19);
 	LCD_SetTextColor(DisplayLCD.Text_color);
 
-	LCD_DisplayStringAt(15, 305, menu_field[GRAPH_FIELD] , LEFT_MODE);
-	LCD_DisplayStringAt(75, 305, menu_field[PARAMS_FIELD], LEFT_MODE);
-	LCD_DisplayStringAt(165, 305, menu_field[LANGS_FIELD], LEFT_MODE);
 }
 
 void Select_Param_tab(){
@@ -224,9 +208,6 @@ void Select_Param_tab(){
 	LCD_FillRect(157, 301, 82,19);
 	LCD_SetTextColor(DisplayLCD.Text_color);
 
-	LCD_DisplayStringAt(15, 305, menu_field[GRAPH_FIELD] , LEFT_MODE);
-	LCD_DisplayStringAt(75, 305, menu_field[PARAMS_FIELD], LEFT_MODE);
-	LCD_DisplayStringAt(165, 305,  menu_field[LANGS_FIELD], LEFT_MODE);
 }
 
 void Select_Lang_tab(){
@@ -241,9 +222,6 @@ void Select_Lang_tab(){
 	LCD_FillRect(1, 301, 64,19);
 	LCD_SetTextColor(DisplayLCD.Text_color);
 
-	LCD_DisplayStringAt(15, 305, menu_field[GRAPH_FIELD] , LEFT_MODE);
-	LCD_DisplayStringAt(75, 305, menu_field[PARAMS_FIELD], LEFT_MODE);
-	LCD_DisplayStringAt(165, 305,  menu_field[LANGS_FIELD], LEFT_MODE);
 }
 
 void Draw_Select_Param(){
@@ -258,17 +236,14 @@ void Draw_Select_Param(){
 	LCD_SetTextColor(LCD_COLOR_ORANGE);
 	LCD_FillRect(67, 301, 89,19);
 	LCD_SetTextColor(DisplayLCD.Text_color);
-	LCD_DisplayStringAt(75, 305, menu_field[PARAMS_FIELD], LEFT_MODE);
 
-
-	LCD_DisplayStringAt(5, 110, menu_field[Param_FIELD], LEFT_MODE);
 	LCD_DrawHLine(87, 115,150);
 	LCD_DrawVLine(87+150, 115, 35);
 	LCD_DrawHLine(3, 115+35, 87+150-3);
 	LCD_DrawVLine(3, 115, 35);
 	
 	
-	LCD_DisplayStringAt(5, 155, menu_field[Desc_FIELD], LEFT_MODE);
+
 	LCD_DrawHLine(87, 160,150);
 	LCD_DrawVLine(87+150, 160, 290-160);
 	LCD_DrawHLine(3, 290, 87+150-3);
@@ -292,21 +267,9 @@ void Select_Param(int16_t index){
 		LCD_FillRect(5, 165, ILI9341_LCD_PIXEL_WIDTH-8, 285-165);
     	LCD_SetTextColor(DisplayLCD.Text_color);
 	}
-
-	LCD_SetFont(&Font16_11);
-	char pstr[23];
-	snprintf(pstr, 23, "<-%s->", param_list[index].name);
-	LCD_DisplayStringAt(0, 125, pstr, CENTER_MODE);
 	
 
 	
-	for (size_t i = 0; i <= max_chunck; i++)
-	{	
-		memset(buffer,'\0',BUFFER_length);
-		strncpy(buffer,param_list[index].description+desc_pnt[i],desc_pnt[i+1]-desc_pnt[i]);
-		LCD_DisplayStringAt(7, 167+16*i, buffer, LEFT_MODE);
-		
-	}
 	LCD_SetFont(DisplayLCD.Font_Default);
 
 
@@ -326,10 +289,8 @@ void Draw_Config_Param(){
 	LCD_FillRect(5, 151, 86-5, 155+12-151);
 	LCD_SetTextColor(DisplayLCD.Text_color);
 
-	LCD_DisplayStringAt(5, 155, menu_field[Value_FIELD], LEFT_MODE);
 
 	LCD_SetFont(&Font16_11);
-	LCD_DisplayStringAt(0, 125, param_list[dummyParam.ID].name, CENTER_MODE);
 	LCD_SetFont(DisplayLCD.Font_Default);
 }
 
@@ -348,12 +309,9 @@ void Config_Param(){
 	LCD_SetTextColor(DisplayLCD.Text_color);
 
 	LCD_SetFont(&Font16_11);
-	LCD_DisplayStringAt(28, 220, dummyParam.char_value, LEFT_MODE);
 	LCD_SetFont(DisplayLCD.Font_Default);
 
 	LCD_SetTextColor(LCD_COLOR_RED);
-	LCD_FillTriangle(28+11*dummyParam.cursor_pos+1, 215, 28+11*(dummyParam.cursor_pos+1)-1, 215, 28+11*dummyParam.cursor_pos+5, 200);
-	LCD_FillTriangle(28+11*dummyParam.cursor_pos+1, 236, 28+11*(dummyParam.cursor_pos+1)-1, 236, 28+11*dummyParam.cursor_pos+5, 251);
 	LCD_SetTextColor(DisplayLCD.Text_color);
 	
 }
@@ -364,7 +322,6 @@ void Save_Param(){
 	}
 
 	LCD_SetTextColor(LCD_COLOR_BLACK);
-	LCD_DisplayStringAt(0, 250, menu_field[CONFIRM_FIELD], CENTER_MODE);
 	LCD_SetTextColor(DisplayLCD.Text_color);
 }
 
@@ -377,7 +334,6 @@ void Cant_Save_Param(){
 	LCD_FillRect(5, 250, ILI9341_LCD_PIXEL_WIDTH-10, 20);
 	LCD_SetTextColor(DisplayLCD.Text_color);
 
-	Display_Status(menu_field[NOSD_FIELD], LCD_COLOR_RED);
 
 }
 
@@ -390,7 +346,6 @@ void Save_Param_Succ(){
 	LCD_FillRect(5, 250, ILI9341_LCD_PIXEL_WIDTH-10, 20);
 	LCD_SetTextColor(DisplayLCD.Text_color);
 
-	Display_Status(menu_field[SAVE_FIELD], LCD_COLOR_BLACK);
 	LCD_SetTextColor(DisplayLCD.Text_color);
 }
 
@@ -406,10 +361,7 @@ void Draw_Select_Lang(){
 	LCD_SetTextColor(LCD_COLOR_ORANGE);
 	LCD_FillRect(157, 301, 82,19);
 	LCD_SetTextColor(DisplayLCD.Text_color);
-	LCD_DisplayStringAt(165, 305, menu_field[LANGS_FIELD], LEFT_MODE);
 
-
-	LCD_DisplayStringAt(5, 110, menu_field[Lang_FIELD], LEFT_MODE);
 	LCD_DrawHLine(87, 115,150);
 	LCD_DrawVLine(87+150, 115, 35);
 	LCD_DrawHLine(3, 115+35, 87+150-3);
@@ -434,7 +386,6 @@ void Select_Lang(int16_t index){
 
 	LCD_SetFont(&Font16_11);
 	char pstr[23];
-	snprintf(pstr, 23, "<-%s->", language[index].name);
 	LCD_DisplayStringAt(0, 125, pstr, CENTER_MODE);
 	LCD_SetFont(DisplayLCD.Font_Default);
 
@@ -565,12 +516,7 @@ void Update_Graph(FLOAT value){
 	UpperBound += 100;
 	LowerBound -= 100;
 	
-	if(UpperBound > AD420_params.Temp_min+AD420_params.Temp_range){
-		UpperBound = AD420_params.Temp_min+AD420_params.Temp_range;
-	}
-	if(LowerBound < AD420_params.Temp_min){
-		LowerBound = AD420_params.Temp_min;
-	}
+	//boundary check
 
 	if(UpperBound != TGraph.max_value || LowerBound!=TGraph.min_value){
 		Scale_Graph(UpperBound, LowerBound);

@@ -25,6 +25,7 @@ uint16_t ili9486_GetLcdPixelWidth(void);
 uint16_t ili9486_GetLcdPixelHeight(void);
 void     ili9486_DrawBitmap(uint16_t Xpos, uint16_t Ypos, uint8_t *pbmp);
 void     ili9486_DrawRGBImage(uint16_t Xpos, uint16_t Ypos, uint16_t Xsize, uint16_t Ysize, uint16_t *pData);
+void     ili9486_DrawRGBImage8(uint16_t Xpos, uint16_t Ypos, uint16_t Xsize, uint16_t Ysize, uint8_t *pData);
 void     ili9486_ReadRGBImage(uint16_t Xpos, uint16_t Ypos, uint16_t Xsize, uint16_t Ysize, uint16_t *pData);
 void     ili9486_Scroll(int16_t Scroll, uint16_t TopFix, uint16_t BottonFix);
 
@@ -49,6 +50,7 @@ LCD_DrvTypeDef   ili9486_drv =
   ili9486_GetLcdPixelHeight,
   ili9486_DrawBitmap,
   ili9486_DrawRGBImage,
+  ili9486_DrawRGBImage8,
   ili9486_FillRect,
   ili9486_ReadRGBImage,
   ili9486_Scroll,
@@ -176,7 +178,7 @@ volatile uint8_t io_ts_busy = 0;
 
 //-----------------------------------------------------------------------------
 /* Link functions for LCD IO peripheral */
-void     LCD_Delay (uint32_t delay);
+void     delay_ms (uint16_t delay);
 void     LCD_IO_Init(void);
 void     LCD_IO_Bl_OnOff(uint8_t Bl);
 
@@ -267,10 +269,13 @@ uint16_t ili9486_ReadID(void)
   ILI9486_LCDMUTEX_PUSH();
   LCD_IO_ReadCmd8MultipleData8(0xD3, (uint8_t *)&id, 3, 1);
   ILI9486_LCDMUTEX_POP();
-  if(id == 0x869400)
+  /*if(id == 0x869400)
     return 0x9486;
   else
     return 0;
+    */
+  uint16_t id16 = id >> 8;
+  return id16;
 }
 
 //-----------------------------------------------------------------------------
@@ -288,13 +293,13 @@ void ili9486_Init(void)
       LCD_IO_Init();
     Is_ili9486_Initialized |= ILI9486_IO_INITIALIZED;
   }
-  LCD_Delay(10);
+  delay_ms(10);
   LCD_IO_WriteCmd8(ILI9486_SWRESET);
-  LCD_Delay(100);
+  delay_ms(100);
 
   LCD_IO_WriteCmd8MultipleData8(ILI9486_RGB_INTERFACE, (uint8_t *)"\x00", 1); // RGB mode off (0xB0)
   LCD_IO_WriteCmd8(ILI9486_SLPOUT);    // Exit Sleep (0x11)
-  LCD_Delay(10);
+  delay_ms(10);
 
   LCD_IO_WriteCmd8MultipleData8(ILI9486_PIXFMT, (uint8_t *)"\x55", 1); // interface format (0x3A)
 
@@ -315,9 +320,9 @@ void ili9486_Init(void)
   LCD_IO_WriteCmd8(ILI9486_NORON);     // Normal display on (0x13)
   LCD_IO_WriteCmd8(ILI9486_INVOFF);    // Display inversion off (0x20)
   LCD_IO_WriteCmd8(ILI9486_SLPOUT);    // Exit Sleep (0x11)
-  LCD_Delay(200);
+  delay_ms(200);
   LCD_IO_WriteCmd8(ILI9486_DISPON);    // Display on (0x29)
-  LCD_Delay(10);
+  delay_ms(10);
 }
 
 //-----------------------------------------------------------------------------
@@ -480,6 +485,14 @@ void ili9486_DrawBitmap(uint16_t Xpos, uint16_t Ypos, uint8_t *pbmp)
   * @retval None
   * @brief  Draw direction: right then down
   */
+void ili9486_DrawRGBImage8(uint16_t Xpos, uint16_t Ypos, uint16_t Xsize, uint16_t Ysize, uint8_t *pData)
+{
+  ili9486_SetDisplayWindow(Xpos, Ypos, Xsize, Ysize);
+  ILI9486_LCDMUTEX_PUSH();
+  LCD_IO_WriteCmd8MultipleData8(ILI9486_RAMWR, pData, Xsize * Ysize *2);
+  ILI9486_LCDMUTEX_POP();
+}
+
 void ili9486_DrawRGBImage(uint16_t Xpos, uint16_t Ypos, uint16_t Xsize, uint16_t Ysize, uint16_t *pData)
 {
   ili9486_SetDisplayWindow(Xpos, Ypos, Xsize, Ysize);
@@ -487,6 +500,7 @@ void ili9486_DrawRGBImage(uint16_t Xpos, uint16_t Ypos, uint16_t Xsize, uint16_t
   LCD_IO_WriteCmd8MultipleData16(ILI9486_RAMWR, pData, Xsize * Ysize);
   ILI9486_LCDMUTEX_POP();
 }
+
 
 //-----------------------------------------------------------------------------
 /**

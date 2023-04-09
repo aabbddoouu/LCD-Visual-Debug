@@ -19,12 +19,12 @@
 
 
 /**
- * @brief struct to compact 
+ * @brief struct to for GPIO definitions 
  * 
  */
 typedef struct
 {
-	uint32_t gpio;
+	uint32_t port;
 	uint32_t pin;
 }gpiopin;
 

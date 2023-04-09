@@ -10,22 +10,22 @@
             "request": "launch",
             "servertype": "stutil",
             "cwd": "${workspaceRoot}",
-            "executable": "./build/SD_menu.elf",
+            "executable": "./build/LCD_debug.elf",
             "name": "Debug (ST-Util)",
             "device": "STM32F767ZI",
             "v1": false,
-            "svdFile": "${workspaceRoot}/STM32F7x7.svd"
+            "svdFile": "STM32F7x7.svd"
         },
         {
-            "showDevDebugOutput": true,
+            "showDevDebugOutput": "True",
             "cwd": "${workspaceRoot}",
-            "executable": "./build/SD_menu.elf",
+            "executable": "./build/LCD_debug.elf",
             "name": "Debug STM32",
             "request": "launch",
             "type": "cortex-debug",
             "servertype": "openocd",
             "preLaunchTask": "Build STM",
-            "device": "stlink",
+            "device": "STM32F767ZI",
             "svdFile": "${workspaceRoot}/STM32F7x7.svd",
             "configFiles": [
                 "${cwd}/openocd.cfg",

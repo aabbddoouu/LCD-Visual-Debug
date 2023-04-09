@@ -1,5 +1,5 @@
 {
-    "cortex-debug.armToolchainPath": ".",
+    "cortex-debug.armToolchainPath": "D:\\VSARM\\ARMCC\\BIN",
     "C_Cpp.errorSquiggles": "Enabled",
     "files.associations": {
         "i2c.h": "c",
@@ -130,8 +130,23 @@
         "fonts.h": "c",
         "ili9341.h": "c",
         "queue": "c",
-        "random": "c"
+        "random": "c",
+        "ili9486.h": "c",
+        "current.h": "c",
+        "defines.h": "c",
+        "exti_common_v1.h": "c",
+        "exti_common_all.h": "c",
+        "fsm.h": "c",
+        "ov2640.h": "c",
+        "dcmi.h": "c",
+        "fatfs_sd.h": "c",
+        "limits.h": "c",
+        "dcmi_common_f47.h": "c",
+        "core_cm3.h": "c"
     },
     "C_Cpp.dimInactiveRegions": true,
+    "stm32-for-vscode.openOCDPath": "D:\\VSARM\\OPENOCD\\BIN\\OPENOCD.EXE",
+    "stm32-for-vscode.makePath": "D:\\VSARM\\GNUWIN32\\BIN\\MAKE.EXE",
+    "stm32-for-vscode.armToolchainPath": "D:\\VSARM\\ARMCC\\BIN",
 
 }

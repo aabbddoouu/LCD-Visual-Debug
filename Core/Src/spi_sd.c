@@ -6,3 +6,4 @@ void open_spi(uint32_t gpio, uint16_t pin){
 void close_spi(uint32_t gpio, uint16_t pin){
 	gpio_set(gpio, pin);
 }
+
