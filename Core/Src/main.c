@@ -124,7 +124,7 @@ void hard_fault_handler(){
 	SCB_AIRCR = SCB_AIRCR_VECTKEY | SCB_AIRCR_SYSRESETREQ;
 }
 
-void init_MCO1(void) {
+void init_MCO1(void) { // 16MHz for the camera PXCLK
 	rcc_set_mco(RCC_CFGR_MCO1_HSI);
 
 	uint32_t reg32;
